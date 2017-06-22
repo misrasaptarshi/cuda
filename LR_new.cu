@@ -20,7 +20,7 @@
 
 void min_max_normalize(double *xs, int m, int d)
 {
-        for (int x = 0; x < d; ++x) {
+        for (int x = 0; x < d-1; ++x) {
                 // calculate std for each column
                 double min = xs[x*d + 0];
                 double max = xs[x*d + 0];
@@ -44,10 +44,10 @@ __global__ void calhyp(double *xs, double *ys, double *params, double *h, int m,
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (index<m){
-		//double accum = params[0];
-		double accum = 0.0;
+		double accum = params[0];
+		//double accum = 0.0;
                 for (int j=0; j<d; j++){
-                        accum += xs[index*d+j] * params[j];
+                        accum += xs[index*(d-1)+j] * params[j+1];
                 }
 		
 		h[index] = 1.0/ (1.0 + exp(-accum));
@@ -59,7 +59,8 @@ __global__ void calgrad (double *xs, double *ys, double *h, double *gradvec, int
 	int index = blockIdx.x * blockDim.x + threadIdx.x;
 
 	if (index < m) {
-		for (int j = 0; j < d; j++){
+		 gradvec[index*d+0] =  (h[index] - ys[index]) * 1;
+		for (int j = 1; j < d; j++){
         	//gradvec[index*d+0] = alpha * (h[index] - ys[index]) * xs[index*d+0];
 		//gradvec[index*d+1] = alpha * (h[index] - ys[index]) * xs[index*d+1];
 		gradvec[index*d+j] =  (h[index] - ys[index]) * xs[index*d+j];
@@ -69,6 +70,36 @@ __global__ void calgrad (double *xs, double *ys, double *h, double *gradvec, int
 	
 }
 
+/*
+__global__ void calhyp(double *xs, double *ys, double *params, double *h, int m, int d){   // m is the no. of samples and d is the number of features in xs(input)
+      int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+      if (index<m*d){
+              //double accum = params[0];
+              //double accum = 0.0;
+              //for (int j=0; j<d; j++){
+              //        accum += xs[index*(d-1)+j] * params[j+1];
+             // }
+
+              h[index] = 1.0/ (1.0 + exp(-xs[index]));
+      }
+}
+
+
+__global__ void calgrad (double *xs, double *ys, double *h, double *gradvec, int m, int d, double alpha){ // alpha is the learning rate
+      int index = blockIdx.x * blockDim.x + threadIdx.x;
+
+      if (index < m*d) {
+               //gradvec[index*d+0] =  (h[index] - ys[index]) * 1;
+              for (int j = 0; j < d; j++){
+              //gradvec[index*d+0] = alpha * (h[index] - ys[index]) * xs[index*d+0];
+              //gradvec[index*d+1] = alpha * (h[index] - ys[index]) * xs[index*d+1];
+              gradvec[index*d+j] =  (h[index] - ys[index]) * xs[index*d+j];
+              }
+	}	
+
+	}
+*/
 
 
 #define WARPSIZE  32
@@ -236,11 +267,12 @@ void reducegrad1 (double *gradvec, double *sumgradvec, int m, int d){
 
 	sumgradvec[0]= 0.0;
 	sumgradvec[1] = 0.0;
+	sumgradvec[2] = 0.0;
 
 	for (int index=0; index<m*d; index+=2){
 		sumgradvec[0] += gradvec[index];
 		sumgradvec[1] += gradvec[index+1];
-		//sumgradvec[2] += gradvec[index+2];
+		sumgradvec[2] += gradvec[index+2];
 	}
 
 	/*for (int i=0; i<d; i++){
@@ -255,11 +287,11 @@ void reducegrad1 (double *gradvec, double *sumgradvec, int m, int d){
 }
 
 
-void updateweight (double *params, double *sumgradvec, int m, int d, float alpha){
+void updateweight (double *params, double *sumgradvec, int m, int d, float alpha, float theta){
 	for (int i=0; i<d; i++){
 		//params[0] = params[0] - sumgradvec[0];
 		//params[1] = params[1] - sumgradvec[1];
-		params[i] = params[i] - alpha * (sumgradvec[i]/m);
+		params[i] = params[i] - alpha * (sumgradvec[i]) - theta * alpha * params[i];
 	}
 }
 
@@ -270,7 +302,7 @@ int main(){
 
 	//Declare variables in host memory and scan the variable values from file
 	int m=  100;
-	int d = 2;
+	int d = 3;
 
 	//float data[m][d];
 	size_t size1 = m*d*sizeof(double);
@@ -278,7 +310,7 @@ int main(){
 	size_t size3 = d*sizeof(double);
 
 	FILE *fp, *fp1;
-        fp = fopen ("rawdata02", "r");
+        fp = fopen ("input", "r");
 
 	double *xs;
 	double *ys;
@@ -296,7 +328,8 @@ int main(){
 	gradvec1 = (double*)malloc(size1);
 	
 	for (int i=0; i<d; i++){
-        	params[i] = 0.0;
+        	//params[i] = -1 + static_cast <float> (rand()) /( static_cast <float> (RAND_MAX/(2)));
+		params[i] = 0.0;
 	}
 
 	if (!fp){
@@ -305,10 +338,10 @@ int main(){
         }
 
         for (int i=0; i<m; i++){
-		for (int j=0; j<d; j++){
+		for (int j=0; j<d-1; j++){
                 //fscanf (fp, "%lf %lf %lf", &xs[i*2+0], &xs[i*2+1], &ys[i]);
-		//fscanf(fp, "%lf", &xs[i*(d-1) + j]);
-		fscanf(fp, "%lf", &xs[i*d + j]);
+		fscanf(fp, "%lf", &xs[i*(d-1) + j]);
+		//fscanf(fp, "%lf", &xs[i*d + j]);
 		}
 		fscanf(fp, "%lf", &ys[i]);
         }
@@ -325,7 +358,7 @@ int main(){
 		printf("%f \n", xs[i]);
 	}*/	
 
-	 for (int i=0; i<20; i+=2) {
+	 for (int i=0; i<8; i+=2) {
          printf("%lf %lf => %lf \n", xs[i], xs[i+1], ys[i/2]);
  }
 
@@ -337,7 +370,7 @@ int main(){
 		}
 	}
 
-	for (int i=0; i<20; i+=2) {
+	for (int i=0; i<8; i+=2) {
       		printf("%lf %lf => %lf \n", xs[i], xs[i+1], ys[i/2]);
 	}
 
@@ -366,25 +399,26 @@ int main(){
 	cudaMalloc(&sumgradvec, sizeof(double)*d);
 	//sumgradvec = (float*)malloc(sizeof(float));
 
-	for (int i=0; i<2; i++){
+	for (int i=0; i<400; i++){
 	calhyp<<<1,100>>>(gpu_xs, gpu_ys, gpu_params, h,  m, d);
 	
 	 cudaMemcpy(h1, h, size2, cudaMemcpyDeviceToHost);
 	
-	for (int j=0; j<m; j++){
+	/*for (int j=0; j<m; j++){
 	printf("%lf \t", h1[j]);
-	}
+	}*/
 
 	calgrad<<<1,100>>>(gpu_xs, gpu_ys, h, gradvec, m, d, 0.03);
 
 	cudaMemcpy(gradvec1, gradvec, size1, cudaMemcpyDeviceToHost);
  	// Sum of all grad vector
- 	//reducegrad<<<100,1>>>(gradvec, sumgradvec, m);
+ 	reducegrad<<<1,100>>>(gradvec, sumgradvec, m, d);
 
-	float x = 0.0;
-/* for (int j=0; j<m*d; j++){
+	/*float x = 0.0;
+ for (int j=0; j<m*d; j++){
          printf("%lf \n", gradvec1[j]);
- }*/
+ }
+*/
 
 /*
  for (int i=0; i<m*d; i++){
@@ -395,23 +429,23 @@ int main(){
 */
 	//float sumgradvechost;
 	//cudaMemset(sumgradvec, 0, d*sizeof(double));
-	reducegrad1(gradvec1, sumgradvechost, m, d);
+	//reducegrad1(gradvec1, sumgradvechost, m, d);
 	//reducegrad1(gradvec, sumgradvechost, m, d);
 
  	// copyout grad's vector from GPU to CPU
- 	//cudaMemcpy (sumgradvechost, sumgradvec, sizeof(double)*d, cudaMemcpyDeviceToHost);
+ 	cudaMemcpy (sumgradvechost, sumgradvec, sizeof(double)*d, cudaMemcpyDeviceToHost);
 
  	// update weight - cpu function
-	updateweight(params, sumgradvechost, m, d, 0.1);
+	updateweight(params, sumgradvechost, m, d, 0.001, 0);
 	
-	 //for (int i=0; i<d; i++){
-         //printf("%lf \n", sumgradvechost[i]);
- 	 //}
+	/* for (int i=0; i<d; i++){
+         	printf("%lf \n", sumgradvechost[i]);
+ 	 }*/
 
-	 /*for (int j=0; j<d; j++){
+	 for (int j=0; j<d; j++){
          printf("%lf \t", params[j]); }
          printf("\n");
-         */
+         
  	
 	//cudaMemcpy(params, gpu_params, size2, cudaMemcpyDeviceToHost);
 	
@@ -431,10 +465,11 @@ int main(){
 
 	 double predict[m];
 	 for (int index=0; index<m; index++){	
-		 //predict[index] = params[0];
-		predict[index] = 0.0;
+		 predict[index] = params[0];
+		//predict[index] = 0.0;
 		 for (int j=0; j<d; j++){
-			predict[index]  += xs[index*d+j] * params[j];
+			//predict[index]  += xs[index*d+j] * params[j];
+			predict[index]  += xs[index*(d-1)+j] * params[j+1];
 		}
 	}
 	
@@ -452,7 +487,7 @@ int main(){
 
 	fp1 = fopen("output", "w");
 	for (int i=0; i<m; i++){
-		fprintf(fp1, "%lf \n",  1 / (1 + exp(-predict[i]))); 
+		fprintf(fp1, "%lf  \t %lf \t %lf \n", predict[i],  1 / (1 + exp(-predict[i])),  exp(-predict[i]) / (1 + exp(-predict[i]))); 
 	}
 
 	
