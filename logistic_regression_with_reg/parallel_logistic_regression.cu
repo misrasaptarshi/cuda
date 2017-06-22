@@ -216,13 +216,22 @@ void updateweight (double *params, double *sumgradvec, int m, int d, float alpha
 }
 
 
-#define num_iterations 100
 
-int main(){
+int main(int argc, char *argv[]){
 
-	//Initialize number of samples and features
-	int m =  100;
-	int d = 3;
+	//Initialize number of samples ,features and iterations 
+	int m, d, num_iterations;
+
+	if (argc!=4){
+		m = 100;
+		d = 3;
+		num_iterations = 100;
+	}
+	else{
+		m = atoi(argv[1]);
+ 		d = atoi(argv[2]);
+ 		num_iterations = atoi(argv[3]);
+	}
 
 	//Allocate host memory variables
 	size_t size1 = m*d*sizeof(double);
@@ -266,16 +275,16 @@ int main(){
 	}
 
 	
-	// Print first 10 rows of input data
-	for (int i=0; i<20; i+=2) {
+	// Print first 5 rows of input data
+	for (int i=0; i<10; i+=2) {
 		printf("%lf %lf => %lf \n", xs[i], xs[i+1], ys[i/2]);
  	}	
 
 	//Max-min mormalize input data
 	min_max_normalize(xs, m, d);	
 
-	//Print first 10 rows of input data after normalization
-	for (int i=0; i<20; i+=2) {
+	//Print first 5 rows of input data after normalization
+	for (int i=0; i<10; i+=2) {
       		printf("%lf %lf => %lf \n", xs[i], xs[i+1], ys[i/2]);
 	}
 
@@ -298,17 +307,21 @@ int main(){
 	cudaMemcpy(gpu_ys, ys, size2, cudaMemcpyHostToDevice);
 	cudaMemcpy(gpu_params, params, size3, cudaMemcpyHostToDevice);
 
+	//Initialize number of thread and blocks for calling GPU kernels
+	int threads_per_block = 512;
+	int blocks_per_grid = (m + threads_per_block - 1) / threads_per_block;
+
 
 	for (int i=0; i<num_iterations; i++){
 		
 		//Compute hypothesis function and element-wise gradients
-		map<<<2,64>>>(m, gpu_xs, gpu_ys, gpu_params, gradvec, d);
+		map<<<blocks_per_grid, threads_per_block>>>(m, gpu_xs, gpu_ys, gpu_params, gradvec, d);
 
 		//Copy the element wise gradients from GPU to CPU
 		cudaMemcpy(gradvec1, gradvec, size1, cudaMemcpyDeviceToHost);
 
  		//Compute sum of all grad vector in GPU
-		reducegrad<<<2,64>>>(gradvec, sumgradvec, m, d);
+		reducegrad<<<blocks_per_grid, threads_per_block>>>(gradvec, sumgradvec, m, d);
 
 
  		//Copy out grad's vector from GPU to CPU
