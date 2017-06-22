@@ -3,5 +3,3 @@
 2. The file input is the actual input data file used.
 
 3. The file parallel_logistic_regression contains the CUDA C implementation for parallelized logistic regression with regularizer to be run on GPUs.
-
-

@@ -1,4 +1,4 @@
-#include<stdio.h>
+nclude<stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <curand.h>
@@ -372,5 +372,6 @@ int main(int argc, char *argv[]){
 
 		
 } 
+
 
 
