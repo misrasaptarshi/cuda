@@ -57,7 +57,7 @@ void map1(int n, double *xs, double *c, int k, int *cluster_index, double *s1, d
 
 void calculate_centroids (double *c1, double *s0, double *s1, double *s2, int k, int d, double cost){
 
-        cost = 0.0;
+        //cost = 0.0;
         for (int i = 0; i < k; i++){
                 for (int j = 0; j < d; j++){
                 if (s0[i] >= 1){
@@ -66,7 +66,7 @@ void calculate_centroids (double *c1, double *s0, double *s1, double *s2, int k,
                 else{
                         c1 [i*d + j] = s1[i*d + j]/ 1;
                 }
-                cost += (c1[i*d + j] * ((c1[i*d + j] * s0[i]) - 2*s1[i])) + s2[i];
+                //cost += (c1[i*d + j] * ((c1[i*d + j] * s0[i]) - 2*s1[i])) + s2[i];
         }
         }
         //printf("%lf \n", cost);
@@ -74,15 +74,46 @@ void calculate_centroids (double *c1, double *s0, double *s1, double *s2, int k,
 
 
 
-#define num_iterations 1
+void calculate_cost (int n, double *xs, double *c1, double *s0, double *s1, double *s2, int k, int d, double cost){
+
+        cost = 0.0;
+        /*for (int i = 0; i < n; i++){
+                for (int j = 0; j < d; j++){
+                int cluster = cluster_index[i];
+                cost[0] += (xs[i*d+j] - c1[cluster*d+j]) * (xs[i*d+j] - c1[cluster*d+j]);
+        }
+        }*/
+
+
+        for (int i=0; i<k*d; i++){
+        int mean = i/d;
+        double x = s0[mean];
+        double center;
+        if (x>1){
+                center = s1[i] / x;
+        }
+        else{
+                center = s1[i];
+        }
+
+        cost += center * (center * x - 2 * s1[i]) + s2[i];
+        }
+
+        printf("COSSTT: %lf \n", cost);
+}
+
+
+
+
+#define num_iterations 5
 #include <time.h>
 
 int main(){
         clock_t start, end;
         double time_used;
 
-        int n = 1000000;
-        int d = 400;
+        int n = 200;
+        int d = 2;
         int k = 2;
 
          //Allocate host memory variables
@@ -128,7 +159,7 @@ int main(){
 
 	
 	FILE *fp;
- 	fp = fopen ("input", "r");
+ 	fp = fopen ("kmeans_data", "r");
 
  	if (!fp){
         	printf ("Unable to open file!");
@@ -193,36 +224,40 @@ int main(){
         	memset((void*)s0_host, 0, size4);
         	//Compute hypothesis function and element-wise gradients
         	map(n, xs, c_host, k, s0_host, cluster_index_host, d);
-        	end = clock();
+        	/*end = clock();
         	time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
         	printf("%f \n", time_used);
-
+*/
 
         	//Copy the element wise gradients from GPU to CPU
         	//cudaMemcpy(gradvec1, gradvec, size1, cudaMemcpyDeviceToHost);
 
         	//Compute sum of all grad vector in GPU
-        	start = clock();
+        	//start = clock();
         	memset((void*)s1_host, 0, size5);
         	memset((void*)s2_host, 0, size5);
         	map1(n, xs, c_host, k, cluster_index_host, s1_host, s2_host, d);
-        	end = clock();
+        	/*end = clock();
         	time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
         	printf("%f \n", time_used);
+		*/
 
         	//Calculate centroids
-                start = clock();
+                //start = clock();
                 calculate_centroids (c1_host, s0_host, s1_host, s2_host, k, d, cost);
-		end = clock();
+		calculate_cost (n, xs, c1_host, s0_host, s1_host, s2_host, k, d, cost);
+		/*end = clock();
 		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
 		printf("%f \n", time_used);
+		*/
+
                 /*for (int i=0; i<k; i++){
                         for (int j=0; j<d; j++){
                                 printf("%lf \n", c1_host[i*d + j]);
                         }
                 }*/
 
-                start = clock();
+                //start = clock();
                 double maxdelta = 0.0;
 
                 for (int i=0; i<k; i++){
@@ -265,3 +300,4 @@ int main(){
 
 	
 }	
+

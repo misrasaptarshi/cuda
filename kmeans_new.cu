@@ -98,8 +98,12 @@ double *c, int k, int *cluster_index, double *s1, double *s2, int d){
 __global__ void map2(int n, double *xs, double *c, int k, int *cluster_index, int *intermediates0, double *intermediates1, double *intermediates2, int d){
      int blocksize = n / 450 + 1;
      int start = blockIdx.x * blocksize;
-     int end = start + blocksize;
+     int end1 = start + blocksize;
+	int end;
+	if (end1>n) end = n;
+	else end = end1;
 
+		if (end >= n ) return;
 		// loop for every K 
 		for (int i = threadIdx.y; i < k; i+= blockDim.y){
 			// loop for every dimension(features)
@@ -121,14 +125,17 @@ __global__ void map2(int n, double *xs, double *c, int k, int *cluster_index, in
 				// Calculate intermediate S1 and S2
 				double sum1 = 0.0;
 				double sum2 = 0.0;
+                                int idx ;
 				for (int z=start; z<end; z++) {
 					if(cluster_index[z] == i) {
-						sum1 += xs[z * d + j];
-						sum2 += xs[z * d + j] * xs[z * d + j];
+                                                idx = z * d + j;
+						sum1 += xs[idx];
+						sum2 += xs[idx] * xs[idx];
 
 					}
 				}
 				int index = (blockIdx.x*k*d + i*d + j);
+                           //if (blockIdx.x < 3) printf("sum1 : %f :: %d -- %d => %d \n", sum1, index, j , i);
 				intermediates1[index] = sum1;
 				intermediates2[index] = sum2;
 			}
@@ -153,9 +160,10 @@ __global__ void map3(int n, double *xs, double *c, int k, int *cluster_index, in
 						s0[i] += intermediates0[z];
 					}
 				}
+			}	
 
 			// Calculate S1 and S2
-            		int start = i * k + j;
+            		int start = i * d + j;
             		int kd    = k * d;
             		double *s1end = &intermediates1[450 * kd];
             		double *s1cur = &intermediates1[start];
@@ -166,8 +174,8 @@ __global__ void map3(int n, double *xs, double *c, int k, int *cluster_index, in
 				s1[start] += *s1cur;
 				s2[start] += *s2cur;
 	           	}
+ 		//printf("start %d :: S1 %f \n", start, s1[start]);
 
-			}	
 		}
 	}
 }		
@@ -196,7 +204,7 @@ __global__ void map3(int n, double *xs, double *c, int k, int *cluster_index, in
 
 void calculate_centroids (double *c1, int *s0, double *s1, double *s2, int k, int d, double cost){
 	
-	cost = 0.0;
+	//cost = 0.0;
 	for (int i = 0; i < k; i++){
 		for (int j = 0; j < d; j++){
 		if (s0[i] >= 1){
@@ -205,35 +213,65 @@ void calculate_centroids (double *c1, int *s0, double *s1, double *s2, int k, in
 		else{
 			c1 [i*d + j] = s1[i*d + j]/ 1;
 		}
-		cost += (c1[i*d + j] * ((c1[i*d + j] * s0[i]) - 2*s1[i])) + s2[i];
+		//cost += (c1[i*d + j] * ((c1[i*d + j] * s0[i]) - 2*s1[i])) + s2[i];
 	}
 	}
 	//printf("%lf \n", cost);
-} 
+}
+
+
+void calculate_cost (int n, double *xs, double *c1, int *s0, double *s1, double *s2, int k, int d, double cost){
+
+        cost = 0.0;
+        /*for (int i = 0; i < n; i++){
+                for (int j = 0; j < d; j++){
+                int cluster = cluster_index[i];
+                cost[0] += (xs[i*d+j] - c1[cluster*d+j]) * (xs[i*d+j] - c1[cluster*d+j]);
+        }
+        }*/
+
+
+        for (int i=0; i<k*d; i++){
+        int mean = i/d;
+        int x = s0[mean];
+        double center;
+        if (x>1){
+                center = s1[i] / x;
+        }
+        else{
+                center = s1[i];
+        }
+
+        cost += center * (center * x - 2 * s1[i]) + s2[i];
+        }
+
+        printf("COSSTT: %lf \n", cost);
+}
+ 
 
 
 
-#define num_iterations 1
+#define num_iterations 2
 #include <time.h>
 
 int main(){
 	clock_t start, end;
 	double time_used;
 
-	int n = 150;
-	int d = 4;
-	int k = 3;
+	int n = 1000000;
+	int d = 400;
+	int k = 2;
 	
 	 //Allocate host memory variables
  	size_t size1 = n*d*sizeof(double);
  	size_t size2 = n*sizeof(double);
 	size_t size3 = d*sizeof(double);
 	size_t size4 = k*sizeof(int);
-	size_t size5 = k*k*sizeof(double);
+	size_t size5 = k*d*sizeof(double);
 	size_t size6 = n*sizeof(int);
 	size_t size7 = k*sizeof(int);
-	size_t size8 = k*sizeof(int);
-	size_t size9 = k*d*d*sizeof(double);
+	size_t size8 = k*450*sizeof(int);
+	size_t size9 = k*d*450*sizeof(double);
 
 
 
@@ -257,6 +295,7 @@ int main(){
 	int *intermediates0;
         double *intermediates1;
         double *intermediates2;
+	double *intermediates1_host;
 	
 
 
@@ -268,6 +307,7 @@ int main(){
 	s0_host = (int*)malloc(size4);
 	s1_host = (double*)malloc(size5);
 	s2_host = (double*)malloc(size5);
+	intermediates1_host = (double*)malloc(size9);
 	//cost = (double*)malloc(sizeof(float));
 	//c = (double*)malloc(size4);
 	//s0 = (double*)malloc(size4);
@@ -296,19 +336,10 @@ int main(){
 	}
 
 
-	//Copy vectors from host memory to device memory
-	/*cudaMemcpy(gpu_xs, xs, size1, cudaMemcpyHostToDevice);
-	cudaMemcpy(gpu_ys, ys, size2, cudaMemcpyHostToDevice);
-	cudaMemcpy(s0, s0_host, size4, cudaMemcpyHostToDevice);
-	cudaMemcpy(s1, s1_host, size5, cudaMemcpyHostToDevice);
-	cudaMemcpy(s2, s2_host, size5, cudaMemcpyHostToDevice);
-	*/
-
-	//double xs[600], xs1[12], ys[150];
 
 	//Read input data from file
 	FILE *fp;
-	fp = fopen ("iris", "r");
+	fp = fopen ("input", "r");
 
 	if (!fp){
         	printf ("Unable to open file!");
@@ -325,7 +356,7 @@ int main(){
 
 	fclose(fp);
 
-	printf("HI1");
+	//printf("HI1");
 
 	/*for (int i=0; i<5; i++){
          	for (int j=0; j<d; j++){
@@ -336,11 +367,11 @@ int main(){
 
 	//Randomly select k datapoints as centroids
 
-	int ind[3];
+	int ind[2];
 
 	for (int i=0; i<k; i++){
 		ind[i] = rand()%n;
-		//printf ("%d \t", ind[i]);
+		printf ("%d \t", ind[i]);
 	}
 	
 
@@ -359,10 +390,6 @@ int main(){
 }
 */	
 
-
-
-
-	cudaMemcpy(c, c_host, size5, cudaMemcpyHostToDevice);
 	
 	//cudaMemcpy(c_host, c, size5, cudaMemcpyDeviceToHost);
 
@@ -374,13 +401,21 @@ int main(){
         }
 }
 */
-	printf("HI"); 
+	//printf("HI"); 
 
+
+	start = clock();
+	cudaMemcpy(c, c_host, size5, cudaMemcpyHostToDevice);
 	cudaMemcpy(gpu_xs, xs, size1, cudaMemcpyHostToDevice);
 	cudaMemcpy(gpu_ys, ys, size2, cudaMemcpyHostToDevice);
 	cudaMemcpy(s0, s0_host, size4, cudaMemcpyHostToDevice);
 	cudaMemcpy(s1, s1_host, size5, cudaMemcpyHostToDevice);
 	cudaMemcpy(s2, s2_host, size5, cudaMemcpyHostToDevice);
+	end = clock();
+	time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	printf("Time taken for copy in : %f \n", time_used);
+
+
 
 	//double cost = 10000000.0;
 	//double cost1 = 0.0;
@@ -391,7 +426,7 @@ int main(){
           	start = clock();
 		cudaMemset((void*)s0, 0, size4);
                 //Compute hypothesis function and element-wise gradients
-                map<<<2,75>>>(n, gpu_xs, c, k, s0, cluster_index, d);
+                map<<<2000,512>>>(n, gpu_xs, c, k, s0, cluster_index, d);
 
 
                 //Copy the element wise gradients from GPU to CPU
@@ -399,9 +434,6 @@ int main(){
 
                 //Compute sum of all grad vector in GPU
 		cudaMemset((void*)s1, 0, size5);
-                end = clock();
-                time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-        	printf("Time taken for map : %f \n", time_used);
 
 		cudaMemset((void*)s2, 0, size5);
 
@@ -416,57 +448,57 @@ int main(){
 			}
 		}*/
 
-		start = clock();
-		dim3 nthreads(4,3);
+		
+		cudaMemset((void*)intermediates0, 0, size8);
+		cudaMemset((void*)intermediates1, 0, size9);
+		cudaMemset((void*)intermediates2, 0, size9);
+	
+		dim3 nthreads(400,2);
 		map2<<<450,nthreads>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, d);		
 
 		//cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
-		end = clock();
-		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("Time taken for map1 : %f \n", time_used);
 
 
-		start = clock();
-		dim3 nthreads1(4,3);
-		map3<<<1,nthreads1>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, s0, s1, s2, d);
+		cudaMemcpy(intermediates1_host, intermediates1, size5, cudaMemcpyDeviceToHost);
 
-		cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
-		end = clock();
-		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("Time taken for map1 : %f \n", time_used);
 		
-	
-		start = clock();
-		cudaMemcpy(s1_host, s1, size5, cudaMemcpyDeviceToHost);
-		end = clock();
- 		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("%f \n", time_used);
- 		
 
-		start = clock();
+		dim3 nthreads1(400,2);
+		map3<<<1,nthreads1>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, s0, s1, s2, d);
+		
+		cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
+	
+
+		/*for (int i=0; i<k; i++){
+        		printf("%d \n", s0_host[i]);
+		}
+		*/
+	
+	
+		cudaMemcpy(s1_host, s1, size5, cudaMemcpyDeviceToHost);
+ 		
 		cudaMemcpy(s2_host, s2, size5, cudaMemcpyDeviceToHost);
-		end = clock();
-		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("%f \n", time_used);
+	
 
 		/*for (int i=0; i<k; i++){
 			for (int j=0; j<d; j++){
 				printf("%lf \n", s1_host[i*d+j]);
 			}
-		} 
-		*/
-		start = clock();
+		} */
+		
+		
 		calculate_centroids (c1_host, s0_host, s1_host, s2_host, k, d, cost);
-		end = clock();
-		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("%f \n", time_used);
-		/*for (int i=0; i<k; i++){
+
+		calculate_cost (n, xs, c1_host, s0_host, s1_host, s2_host, k, d, cost);
+		
+		for (int i=0; i<k; i++){
 			for (int j=0; j<d; j++){
         			printf("%lf \n", c1_host[i*d + j]);
 			}
-		}*/
+		}
+		
 
-		start = clock();
+
 		double maxdelta = 0.0;
 
 		for (int i=0; i<k; i++){
@@ -474,29 +506,25 @@ int main(){
 				maxdelta += (c1_host[i*d+j] - c_host[i*d+j]) * (c1_host[i*d+j] - c_host[i*d+j]);
 			}
 		}
-		end = clock();
-		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("%f \n", time_used);
 
 
-
-		start = clock();	
+	
 		memcpy(c_host, c1_host, size5);
-		end = clock();
-		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("%f \n", time_used);
 
 		//printf("%lf \n", cost);
 		//printf("%lf \n", maxdelta);
 
 		//changed = maxdelta>0.5;	
-		start = clock();
 		cudaMemcpy(c, c1_host, size5, cudaMemcpyHostToDevice);
 		//cudaMemcpy(s0, s0_host, size6, cudaMemcpyHostToDevice);
 
+
 		end = clock();
 		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-		printf("%lf \n", time_used);
+		printf("Time taken for map1 : %f \n", time_used);
+
+
+
 				
 	}
 	//}
