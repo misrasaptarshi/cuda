@@ -349,13 +349,13 @@ int main(int argc, char *argv[]){
 		cudaMemset((void*)intermediates1, 0, size9);
 		cudaMemset((void*)intermediates2, 0, size9);
 	
-		dim3 nthreads(2,2);
+		dim3 nthreads(d,k);
 		map2<<<450,nthreads>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, d);		
 
 		cudaMemcpy(intermediates1_host, intermediates1, size5, cudaMemcpyDeviceToHost);
 
 		
-		dim3 nthreads1(2,2);
+		dim3 nthreads1(d,k);
 		map3<<<1,nthreads1>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, s0, s1, s2, d);
 		
 		cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
