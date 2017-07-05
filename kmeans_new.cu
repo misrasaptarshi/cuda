@@ -38,10 +38,10 @@ __global__ void map(int n, double *xs, double *c, int k, int *s0, int *cluster_i
 			dist = 0.0;
                 	for (int j=0; j<d; j++){
                         	dist += ((xs[index*d + j]) - (c[j1*d+j])) * ((xs[index*d + j]) - (c[j1*d+j]));
-				//if(index == 0 ) printf("%lf \t %lf \t", xs[index*d + j], c[j1*d+j]);
-                	}
-			      //if(index == 0 ) printf("%d: %d -  %d :: %f == %f \n", j1, centroidIndex, j1, dist, prevBest);
-                	if (dist<prevBest) {
+				
+			}
+			      
+			if (dist<prevBest) {
 			      prevBest = dist; centroidIndex = j1; 
 			}
 			
@@ -53,46 +53,6 @@ __global__ void map(int n, double *xs, double *c, int k, int *s0, int *cluster_i
 }
 
 
-/*__global__ void map1(int n, double *xs, double *c, int k, int *cluster_index, double *s1, double *s2, int d){
-
-	int index = blockIdx.x * blockDim.x + threadIdx.x;
-	int index1 = blockIdx.y * blockDim.y + threadIdx.y;
-
-	if ((index<n1) && (index1<n2)){
-        	int ind = cluster_index[index];
-
-		for (int j=0; j<d; j++){
-			c[index*d + j] += xs[index*d+j];		
-		}
-		
-	}
-	
-	
-	
-
-		
-		
-}
-
-
-__global__ void map2(int n, double *xs, f (j == 0) {
-double *c, int k, int *cluster_index, double *s1, double *s2, int d){
-
-        int index = blockIdx.x * blockDim.x + threadIdx.x;
-        int index1 = blockIdx.y * blockDim.y + threadIdx.y;
-
-        if ((index<n1) && (index1<n2)){
-                int ind = cluster_index[index];
-
-                for (int j=0; j<d; j++){
-                        c[index*d + j] += xs[index*d+j];
-                }
-
-        }
-
-
-}
-*/
 
 
 __global__ void map2(int n, double *xs, double *c, int k, int *cluster_index, int *intermediates0, double *intermediates1, double *intermediates2, int d){
@@ -135,8 +95,7 @@ __global__ void map2(int n, double *xs, double *c, int k, int *cluster_index, in
 					}
 				}
 				int index = (blockIdx.x*k*d + i*d + j);
-                           //if (blockIdx.x < 3) printf("sum1 : %f :: %d -- %d => %d \n", sum1, index, j , i);
-				intermediates1[index] = sum1;
+                           	intermediates1[index] = sum1;
 				intermediates2[index] = sum2;
 			}
 	}
@@ -174,33 +133,13 @@ __global__ void map3(int n, double *xs, double *c, int k, int *cluster_index, in
 				s1[start] += *s1cur;
 				s2[start] += *s2cur;
 	           	}
- 		//printf("start %d :: S1 %f \n", start, s1[start]);
+ 		
 
 		}
 	}
 }		
 
 
-/*__global__ void map1(int n, double *xs, double *c, int k, int *cluster_index, double *s1, double *s2, int d){ //xs indicates datapoints, c indicates centroids, k indicates no. of cluster
-
-        int index = blockIdx.x * blockDim.x + threadIdx.x;
-
-        if (index<n){
-                int ind = cluster_index[index];
-
-                for (int j = 0; j < d; j++){
-                                //s1[ind*d + j] += xs[index*d + j];
-				//s2[ind*d + j] += xs[index*d + j] * xs[index*d + j];
-				double x = xs[ind*d+j];
-				double x1 = xs[ind*d + j] * xs[ind*d+j];
-				atomicAddDouble(&s1[ind*d+j] , x);
-				atomicAddDouble(&s2[ind*d+j] , x1);
-				//if(index == 0 ) printf("%d \t %lf \t %lf \n ", cluster_index[index], xs[index*d + j], s1[ind*d + j], xs[index*d+j]);
-                       }
-                	 //if(index == 0 ) printf("%d \t %lf \t %lf \n ", cluster_index[index], s1[ind*d + 0], xs[index*d+0]);
-         }
-}
-*/
 
 void calculate_centroids (double *c1, int *s0, double *s1, double *s2, int k, int d, double cost){
 	
@@ -213,24 +152,17 @@ void calculate_centroids (double *c1, int *s0, double *s1, double *s2, int k, in
 		else{
 			c1 [i*d + j] = s1[i*d + j]/ 1;
 		}
-		//cost += (c1[i*d + j] * ((c1[i*d + j] * s0[i]) - 2*s1[i])) + s2[i];
+		
 	}
 	}
-	//printf("%lf \n", cost);
+	
 }
 
 
 void calculate_cost (int n, double *xs, double *c1, int *s0, double *s1, double *s2, int k, int d, double cost){
 
         cost = 0.0;
-        /*for (int i = 0; i < n; i++){
-                for (int j = 0; j < d; j++){
-                int cluster = cluster_index[i];
-                cost[0] += (xs[i*d+j] - c1[cluster*d+j]) * (xs[i*d+j] - c1[cluster*d+j]);
-        }
-        }*/
-
-
+       
         for (int i=0; i<k*d; i++){
         int mean = i/d;
         int x = s0[mean];
@@ -245,7 +177,7 @@ void calculate_cost (int n, double *xs, double *c1, int *s0, double *s1, double 
         cost += center * (center * x - 2 * s1[i]) + s2[i];
         }
 
-        printf("COSSTT: %lf \n", cost);
+        printf("COST: %lf \n", cost);
 }
  
 
@@ -319,12 +251,7 @@ int main(int argc, char *argv[]){
 	s1_host = (double*)malloc(size5);
 	s2_host = (double*)malloc(size5);
 	intermediates1_host = (double*)malloc(size9);
-	//cost = (double*)malloc(sizeof(float));
-	//c = (double*)malloc(size4);
-	//s0 = (double*)malloc(size4);
-	//s1 = (double*)malloc(size5);
-	//s2 = (double*)malloc(size5);
-
+	
 	cudaMalloc(&gpu_xs, size1);
 	cudaMalloc(&gpu_ys, size2);
 	cudaMalloc(&cluster_index, size6);
@@ -367,14 +294,7 @@ int main(int argc, char *argv[]){
 
 	fclose(fp);
 
-	//printf("HI1");
-
-	/*for (int i=0; i<5; i++){
-         	for (int j=0; j<d; j++){
-                	printf("%lf \n", xs[i*d + j]);
-        	}
-	}*/
-	
+		
 
 	//Randomly select k datapoints as centroids
 
@@ -382,14 +302,10 @@ int main(int argc, char *argv[]){
 
 	for (int i=0; i<k; i++){
 		ind[i] = rand()%n;
-		//printf ("%d \t", ind[i]);
 	}
 	
 	
-	//ind[0] = 0; ind[1] = 60; ind[2] = 100;
 	
-
-
 	for (int i=0; i<k; i++){
 		for (int j=0; j<d; j++){
 			int r = ind[i];
@@ -397,27 +313,8 @@ int main(int argc, char *argv[]){
 		}
 	}
 
-	/*for (int i=0; i<k; i++){
-        for (int j=0; j<d; j++){
-                printf("%lf \n", c_host[i*d + j]);
-        }
-}
-*/	
-
+		
 	
-	//cudaMemcpy(c_host, c, size5, cudaMemcpyDeviceToHost);
-
-
-	
-/*      for (int i=0; i<k; i++){
-        for (int j=0; j<d; j++){
-                printf("%lf \n", c_host[i*d + j]);
-        }
-}
-*/
-	//printf("HI"); 
-
-
 	start = clock();
 	cudaMemcpy(c, c_host, size5, cudaMemcpyHostToDevice);
 	cudaMemcpy(gpu_xs, xs, size1, cudaMemcpyHostToDevice);
@@ -431,8 +328,7 @@ int main(int argc, char *argv[]){
 
 
 
-	//double cost = 10000000.0;
-	//double cost1 = 0.0;
+	
 	//int changed = 1;
 	
 	//while (changed==1){
@@ -448,71 +344,34 @@ int main(int argc, char *argv[]){
 
                 //Compute sum of all grad vector in GPU
 		cudaMemset((void*)s1, 0, size5);
-
 		cudaMemset((void*)s2, 0, size5);
-
-                /*start = clock();
-                map1<<<2000,512>>>(n, gpu_xs, c, k, cluster_index, s1, s2, d);
-		*/
-
-                /*//Update cost
-		for (int i=0; i<k; i++){
-			for (int j=0; j<d; j++){
-				cost1 += (c[i*d + j] * ((c[i*d + j] * s0[i]) - 2*s1[i])) + s2[i];
-			}
-		}*/
-
-		
-		cudaMemset((void*)intermediates0, 0, size8);
+              	cudaMemset((void*)intermediates0, 0, size8);
 		cudaMemset((void*)intermediates1, 0, size9);
 		cudaMemset((void*)intermediates2, 0, size9);
 	
 		dim3 nthreads(2,2);
 		map2<<<450,nthreads>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, d);		
 
-		//cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
-
-
 		cudaMemcpy(intermediates1_host, intermediates1, size5, cudaMemcpyDeviceToHost);
 
 		
-
 		dim3 nthreads1(2,2);
 		map3<<<1,nthreads1>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, s0, s1, s2, d);
 		
 		cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
 	
-
-		/*for (int i=0; i<k; i++){
-        		printf("%d \n", s0_host[i]);
-		}
-		*/
-	
+		
 	
 		cudaMemcpy(s1_host, s1, size5, cudaMemcpyDeviceToHost);
  		
 		cudaMemcpy(s2_host, s2, size5, cudaMemcpyDeviceToHost);
 
-
-		/*for (int i=0; i<k; i++){
-			for (int j=0; j<d; j++){
-				printf("%lf \n", s1_host[i*d+j]);
-			}
-		} */
-		
-	
+			
 		calculate_centroids (c1_host, s0_host, s1_host, s2_host, k, d, cost);
 
 		calculate_cost (n, xs, c1_host, s0_host, s1_host, s2_host, k, d, cost);
 		
-		for (int i=0; i<k; i++){
-			for (int j=0; j<d; j++){
-        			printf("%lf \n", c1_host[i*d + j]);
-			}
-		}
 		
-
-
 		double maxdelta = 0.0;
 
 		for (int i=0; i<k; i++){
@@ -525,13 +384,9 @@ int main(int argc, char *argv[]){
 	
 		memcpy(c_host, c1_host, size5);
 
-		//printf("%lf \n", cost);
-		//printf("%lf \n", maxdelta);
-
 		//changed = maxdelta>0.5;	
 		cudaMemcpy(c, c1_host, size5, cudaMemcpyHostToDevice);
-		//cudaMemcpy(s0, s0_host, size6, cudaMemcpyHostToDevice);
-
+		
 
 		end = clock();
 		time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
