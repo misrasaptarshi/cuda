@@ -251,16 +251,27 @@ void calculate_cost (int n, double *xs, double *c1, int *s0, double *s1, double 
 
 
 
-#define num_iterations 5
 #include <time.h>
 
-int main(){
-	clock_t start, end;
-	double time_used;
+int main(int argc, char *argv[]){
+        clock_t start, end;
+        double time_used;
 
-	int n = 200;
-	int d = 2;
-	int k = 2;
+        int n, d, k, num_iterations;
+
+        if(argc!=5){
+                n = 200;
+                d = 2;
+                k = 2;
+                num_iterations = 5;
+        }
+
+        else{
+                n = atoi(argv[1]);
+                d = atoi(argv[2]);
+                k = atoi(argv[3]);
+                num_iterations = atoi(argv[4]);
+        }
 	
 	 //Allocate host memory variables
  	size_t size1 = n*d*sizeof(double);
