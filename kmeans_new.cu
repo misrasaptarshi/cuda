@@ -329,9 +329,9 @@ int main(int argc, char *argv[]){
 
 
 	
-	//int changed = 1;
+	int changed = 1;
 	
-	//while (changed==1){
+	while (changed==1){
 	for (int i=0; i<num_iterations; i++){
           	start = clock();
 		cudaMemset((void*)s0, 0, size4);
@@ -384,7 +384,7 @@ int main(int argc, char *argv[]){
 	
 		memcpy(c_host, c1_host, size5);
 
-		//changed = maxdelta>0.5;	
+		changed = maxdelta>0.5;	
 		cudaMemcpy(c, c1_host, size5, cudaMemcpyHostToDevice);
 		
 
@@ -396,7 +396,7 @@ int main(int argc, char *argv[]){
 
 				
 	}
-	//}
+	}
 	
 
 	cudaMemcpy(cluster_index_host, cluster_index, size6, cudaMemcpyDeviceToHost);
