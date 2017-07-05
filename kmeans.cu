@@ -128,15 +128,15 @@ void calculate_centroids (double *c1, double *s0, double *s1, double *s2, int k,
 
 
 
-#define num_iterations 1
+#define num_iterations 5
 #include <time.h>
 
 int main(){
 	clock_t start, end;
 	double time_used;
 
-	int n = 1000000;
-	int d = 400;
+	int n = 200;
+	int d = 2;
 	int k = 2;
 	
 	 //Allocate host memory variables

@@ -170,28 +170,31 @@ int main(){
         	for (int j=0; j<d; j++){
                 	fscanf(fp, "%lf", &xs[i*d + j]);
          	}
- 	fscanf(fp, "%lf", &ys[i]);
+ 	//fscanf(fp, "%lf", &ys[i]);
  	}
 
 
 	fclose(fp);
 
 	printf("HI1");
- 	/*for (int i=0; i<5; i++){
+ 	for (int i=0; i<5; i++){
          	for (int j=0; j<d; j++){
                 	printf("%lf \n", xs[i*d + j]);
         	}
-	}*/
+	}
 
 
 	//Randomly select k datapoints as centroids
 
 	int ind[2];
 
-	for (int i=0; i<k; i++){
+	/*for (int i=0; i<k; i++){
         	ind[i] = rand()%n;
          	//printf ("%d \t", ind[i]);
  	}
+	*/
+
+	ind[0] = 5; ind[1] = 70;
 
 
 

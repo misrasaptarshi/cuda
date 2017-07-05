@@ -103,7 +103,7 @@ __global__ void map2(int n, double *xs, double *c, int k, int *cluster_index, in
 	if (end1>n) end = n;
 	else end = end1;
 
-		if (end >= n ) return;
+		if (end > n ) return;
 		// loop for every K 
 		for (int i = threadIdx.y; i < k; i+= blockDim.y){
 			// loop for every dimension(features)
@@ -251,15 +251,15 @@ void calculate_cost (int n, double *xs, double *c1, int *s0, double *s1, double 
 
 
 
-#define num_iterations 2
+#define num_iterations 5
 #include <time.h>
 
 int main(){
 	clock_t start, end;
 	double time_used;
 
-	int n = 1000000;
-	int d = 400;
+	int n = 200;
+	int d = 2;
 	int k = 2;
 	
 	 //Allocate host memory variables
@@ -339,7 +339,7 @@ int main(){
 
 	//Read input data from file
 	FILE *fp;
-	fp = fopen ("input", "r");
+	fp = fopen ("kmeans_data", "r");
 
 	if (!fp){
         	printf ("Unable to open file!");
@@ -350,7 +350,7 @@ int main(){
         	for (int j=0; j<d; j++){
                 	fscanf(fp, "%lf", &xs[i*d + j]);
         	}	
-        fscanf(fp, "%lf", &ys[i]);
+        //fscanf(fp, "%lf", &ys[i]);
 	}
 
 
@@ -371,8 +371,11 @@ int main(){
 
 	for (int i=0; i<k; i++){
 		ind[i] = rand()%n;
-		printf ("%d \t", ind[i]);
+		//printf ("%d \t", ind[i]);
 	}
+	
+	
+	//ind[0] = 0; ind[1] = 60; ind[2] = 100;
 	
 
 
@@ -426,7 +429,7 @@ int main(){
           	start = clock();
 		cudaMemset((void*)s0, 0, size4);
                 //Compute hypothesis function and element-wise gradients
-                map<<<2000,512>>>(n, gpu_xs, c, k, s0, cluster_index, d);
+                map<<<2,100>>>(n, gpu_xs, c, k, s0, cluster_index, d);
 
 
                 //Copy the element wise gradients from GPU to CPU
@@ -453,7 +456,7 @@ int main(){
 		cudaMemset((void*)intermediates1, 0, size9);
 		cudaMemset((void*)intermediates2, 0, size9);
 	
-		dim3 nthreads(400,2);
+		dim3 nthreads(2,2);
 		map2<<<450,nthreads>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, d);		
 
 		//cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
@@ -463,7 +466,7 @@ int main(){
 
 		
 
-		dim3 nthreads1(400,2);
+		dim3 nthreads1(2,2);
 		map3<<<1,nthreads1>>>(n, gpu_xs, c, k, cluster_index, intermediates0, intermediates1, intermediates2, s0, s1, s2, d);
 		
 		cudaMemcpy(s0_host, s0, size4, cudaMemcpyDeviceToHost);
@@ -478,7 +481,7 @@ int main(){
 		cudaMemcpy(s1_host, s1, size5, cudaMemcpyDeviceToHost);
  		
 		cudaMemcpy(s2_host, s2, size5, cudaMemcpyDeviceToHost);
-	
+
 
 		/*for (int i=0; i<k; i++){
 			for (int j=0; j<d; j++){
@@ -486,7 +489,7 @@ int main(){
 			}
 		} */
 		
-		
+	
 		calculate_centroids (c1_host, s0_host, s1_host, s2_host, k, d, cost);
 
 		calculate_cost (n, xs, c1_host, s0_host, s1_host, s2_host, k, d, cost);
